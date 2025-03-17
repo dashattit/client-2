@@ -1,10 +1,11 @@
+// компонент node-card
 Vue.component('node-card', {
     props: ['note'],
     template: `
     <div class="node-card">
         <h3>{{ note.title }}</h3>
         <ul>
-            <li v-for="note in notes">
+            <li v-for="(item, index) in note.items" :key="index">
                 <label>
                     <input type="checkbox" v-model="item.completed" @change="updateCompletion">
                     {{ item.text }}
@@ -22,6 +23,7 @@ Vue.component('node-card', {
     }
 });
 
+// компонент column
 Vue.component('column', {
     // данные
     props: ['title', 'notes', 'maxNotes', 'isLocked', 'allowAdd'],
@@ -38,9 +40,6 @@ Vue.component('column', {
     </div>
     `,
 });
-
-
-
 
 let vue = new Vue({
     el: '#app',
