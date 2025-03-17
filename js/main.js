@@ -1,3 +1,27 @@
+Vue.component('node-card', {
+    props: ['note'],
+    template: `
+    <div class="node-card">
+        <h3>{{ note.title }}</h3>
+        <ul>
+            <li v-for="note in notes">
+                <label>
+                    <input type="checkbox" v-model="item.completed" @change="updateCompletion">
+                    {{ item.text }}
+                </label>
+            </li>
+        </ul>
+    </div>  
+    `,
+    //метод для обработки изменения пункта
+    methods: {
+        updateCompletion() {
+            //генерация события и передача карточки
+            this.$emit('update-note', this.note);
+        }
+    }
+});
+
 Vue.component('column', {
     // данные
     props: ['title', 'notes', 'maxNotes', 'isLocked', 'allowAdd'],
@@ -12,8 +36,11 @@ Vue.component('column', {
                 @move-note="$emit('move-note', index)"
         </note-card>
     </div>
-    `
+    `,
 });
+
+
+
 
 let vue = new Vue({
     el: '#app',
