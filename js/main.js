@@ -137,6 +137,30 @@ let App = ({
                 this.newNoteItems.splice(index, 1);
             }
         },
+        updateNote(index, updatedNote) {
+            const noteCopy = this.deepCopyNote(updatedNote);
+            this.notes[index] = noteCopy;
+            this.saveNotes();
+        },
+        moveNote(index, newColumn) {
+            // копия карточки перед перемещением
+              const noteCopy = this.deepCopyNote(this.notes[index]);
+              noteCopy.column = newColumn;
+              this.notes[index] = noteCopy;
+              this.saveNotes();
+        },
+        checkNoteCompletion (index) {
+            const note = this.notes[index];
+            const completedItems = note.items.filter(item => item.completed).length;
+            const totalItems = note.items.length;
+
+            if (completedItems === totalItems) {
+                note.completedDate = new Date().toLocaleString();
+            }
+        },
+        saveNotes() {
+            localStorage.setItem('notes', JSON.stringify(this.notes));
+        }
     },
 })
 
