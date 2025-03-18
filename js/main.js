@@ -105,7 +105,23 @@ let App = ({
         thirdColumnNotes() {
             return this.notes.filter(note => note.column === 3);
         }
-    }
+    },
+    methods: {
+        deepCopyNote (note) {
+            return JSON.parse(JSON.stringify(note));
+        },
+        createNote (note) {
+
+        },
+        addItem(){
+            this.newNoteItems.push({ text: '' });
+        },
+        removeItem(index){
+            if (this.newNoteItems.length > 1) {
+                this.newNoteItems.splice(index, 1);
+            }
+        },
+    },
 })
 
 let vue = new Vue({
