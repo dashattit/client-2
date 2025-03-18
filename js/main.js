@@ -91,8 +91,11 @@ let App = ({
     `,
     data() {
         return {
-            notes: null,
+            notes: JSON.parse(localStorage.getItem('notes')) || [],
             isFirstColumnLocked: false,
+            newNoteTitle: '',
+            newNoteItems: [{ text: '' }],
+            showCreateForm: false,
         }
     },
     computed: {
@@ -111,7 +114,20 @@ let App = ({
             return JSON.parse(JSON.stringify(note));
         },
         createNote (note) {
-
+            if (this.newNoteTitle && this.newNoteItems.some(item => item.text)) {
+                const newNote = {
+                    id: Date.now(),
+                    title: this.newNoteTitle,
+                    items: this.newNoteItems.filter(item => item.text).map(item => ({ text: item.text, completed: false })),
+                    column: 1, // Новая карточка всегда создается в первом столбце
+                    completedDate: null
+                };
+                this.notes.push(newNote);
+                this.newNoteTitle = '';
+                this.newNoteItems = [{ text: '' }];
+                this.showCreateForm = false;
+                this.saveNotes();
+            }
         },
         addItem(){
             this.newNoteItems.push({ text: '' });
