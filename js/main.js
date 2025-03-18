@@ -44,6 +44,7 @@ Vue.component('node-card', {
     }
 });
 
+// самый главный компонент
 let App = ({
     template: `
     <div class="columns">
@@ -75,6 +76,17 @@ let App = ({
             @update-note="updateNote"
             @move-note="moveNote"
         ></column>
+        <div class="new-note-form">
+            <input type="text" v-model="newNoteTitle" placeholder="Название карточки">
+            <ul>
+                <li v-for="(item, index) in newNoteItems" :key="index">
+                    <input type="text" v-model="item.text" placeholder="пункт списка">
+                    <button @click="removeItem(index)">Удалить</button>
+                </li>
+            </ul>
+            <button @click="addItem">Добавить пункт</button>
+            <button @click="createNote">Создать карточку</button>
+            <button @click="showCreateForm = false">Отмена</button>
     </div>
     `,
     data() {

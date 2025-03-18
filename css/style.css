@@ -11,8 +11,22 @@ body {
 }
 
 .column {
+    flex: 1;
     background-color: #7c95df;
     padding: 20px;
     border-radius: 2px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.columns {
+    display: flex;
+    gap: 20px;
+}
+
+.note-card {
+    background-color: #f4f4f4;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
