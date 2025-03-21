@@ -1,7 +1,6 @@
-/ компонент column
+// компонент column
 Vue.component('column', {
-    props: ['title', 'notes', 'maxNotes', 'isLocked', 'allowAdd'],
-    // шаблон
+    props: ['title', 'notes', 'maxNotes', 'isLocked'],
     template: `
         <div class="column" :class="{ 'locked': isLocked }">
             <h2>{{ title }}</h2>
@@ -12,16 +11,18 @@ Vue.component('column', {
                 @update-note="$emit('update-note', index, $event)"
                 @move-note="$emit('move-note', index, $event)"
             ></note-card>
-            <button @click="$emit('add-note')" v-if="allowAdd" :disabled="notes.length >= maxNotes || isLocked">Добавить карточку</button>
+            <button 
+                v-if="title === 'Столбец 1 (до 3 карточек)'" 
+                @click="$emit('add-note')" 
+                :disabled="notes.length >= maxNotes || isLocked"
+            >Добавить карточку</button>
         </div>
     `
 });
 
 // компонент note-card
 Vue.component('note-card', {
-    // принимаем props, который содержит данные
     props: ['note'],
-    // шаблон
     template: `
         <div class="note-card">
             <h3>{{ note.title }}</h3>
@@ -36,10 +37,8 @@ Vue.component('note-card', {
             <p v-if="note.completedDate">Завершено: {{ note.completedDate }}</p>
         </div>
     `,
-    // метод для обработки изменения пункта
     methods: {
         updateCompletion() {
-            // генерируем событие и передаем обновленную карточку
             this.$emit('update-note', this.note);
         }
     }
@@ -50,55 +49,60 @@ let App = ({
     template: `
         <div class="columns">
             <column 
-                title="Столбец 1" 
+                title="Столбец 1 (до 3 карточек)" 
                 :notes="firstColumnNotes" 
                 :maxNotes="3" 
                 :isLocked="isFirstColumnLocked"
-                :allowAdd="true"
                 @update-note="updateNote"
                 @move-note="moveNote"
-                @add-note="showCreateForm = true"
+                @add-note="openModal"
             ></column>
             <column 
-                title="Столбец 2" 
+                title="Столбец 2 (до 5 карточек)" 
                 :notes="secondColumnNotes" 
                 :maxNotes="5" 
                 :isLocked="false"
-                :allowAdd="false"
                 @update-note="updateNote"
                 @move-note="moveNote"
             ></column>
             <column 
-                title="Столбец 3" 
+                title="Столбец 3 (без ограничений)" 
                 :notes="thirdColumnNotes" 
                 :maxNotes="Infinity" 
                 :isLocked="false"
-                :allowAdd="false"
                 @update-note="updateNote"
                 @move-note="moveNote"
             ></column>
-            <!-- Форма для создания новой карточки -->
-            <div class="new-note-form" v-if="showCreateForm">
-                <input type="text" v-model="newNoteTitle" placeholder="Название карточки">
-                <ul>
-                    <li v-for="(item, index) in newNoteItems" :key="index">
-                        <input type="text" v-model="item.text" placeholder="Пункт списка">
-                        <button @click="removeItem(index)">Удалить</button>
-                    </li>
-                </ul>
-                <button @click="addItem">Добавить пункт</button>
-                <button @click="createNote">Создать карточку</button>
-                <button @click="showCreateForm = false">Отмена</button>
+            
+            <!-- Модальное окно для создания карточки -->
+            <div v-if="isModalOpen" class="modal">
+                <div class="modal-content">
+                    <h2>Создать новую карточку</h2>
+                    <label>
+                        Название карточки:
+                        <input v-model="newNoteTitle" type="text">
+                    </label>
+                    <div v-for="(item, index) in newNoteItems" :key="index">
+                        <label>
+                            Пункт {{ index + 1 }}:
+                            <input v-model="item.text" type="text">
+                        </label>
+                    </div>
+                    <button @click="addNewItem">Добавить пункт</button>
+                    <button @click="createNote">Создать карточку</button>
+                    <button @click="closeModal">Отмена</button>
+                </div>
             </div>
         </div>
     `,
     data() {
         return {
-            notes: JSON.parse(localStorage.getItem('notes')) || [],
+            // notes: JSON.parse(localStorage.getItem('notes')) || [],
+            notes: [],
             isFirstColumnLocked: false,
+            isModalOpen: false,
             newNoteTitle: '',
-            newNoteItems: [{ text: '' }],
-            showCreateForm: false
+            newNoteItems: [{ text: '', completed: false }]
         };
     },
     computed: {
@@ -113,46 +117,36 @@ let App = ({
         }
     },
     methods: {
-        // Создание глубокой копии карточки
-        deepCopyNote(note) {
-            return JSON.parse(JSON.stringify(note));
+        openModal() {
+            this.isModalOpen = true;
+        },
+        closeModal() {
+            this.isModalOpen = false;
+            this.newNoteTitle = '';
+            this.newNoteItems = [{ text: '', completed: false }];
+        },
+        addNewItem() {
+            this.newNoteItems.push({ text: '', completed: false });
         },
         createNote() {
-            if (this.newNoteTitle && this.newNoteItems.some(item => item.text)) {
-                const newNote = {
-                    id: Date.now(),
-                    title: this.newNoteTitle,
-                    items: this.newNoteItems.filter(item => item.text).map(item => ({ text: item.text, completed: false })),
-                    column: 1, // Новая карточка всегда создается в первом столбце
-                    completedDate: null
-                };
-                this.notes.push(newNote);
-                this.newNoteTitle = '';
-                this.newNoteItems = [{ text: '' }];
-                this.showCreateForm = false;
-                this.saveNotes();
-            }
-        },
-        addItem() {
-            this.newNoteItems.push({ text: '' });
-        },
-        removeItem(index) {
-            if (this.newNoteItems.length > 1) {
-                this.newNoteItems.splice(index, 1);
-            }
+            const newNote = {
+                id: Date.now(),
+                title: this.newNoteTitle,
+                items: this.newNoteItems.filter(item => item.text.trim() !== ''),
+                column: 1,
+                completedDate: null
+            };
+            this.notes.push(newNote);
+            this.saveNotes();
+            this.closeModal();
         },
         updateNote(index, updatedNote) {
-            // Создаем глубокую копию обновленной карточки
-            const noteCopy = this.deepCopyNote(updatedNote);
-            this.notes[index] = noteCopy;
-            this.checkNoteCompletion(index); // Проверяем состояние карточки
+            this.notes[index] = updatedNote;
+            this.checkNoteCompletion(index);
             this.saveNotes();
         },
         moveNote(index, newColumn) {
-            // Создаем глубокую копию карточки перед перемещением
-            const noteCopy = this.deepCopyNote(this.notes[index]);
-            noteCopy.column = newColumn;
-            this.notes[index] = noteCopy;
+            this.notes[index].column = newColumn;
             this.saveNotes();
         },
         checkNoteCompletion(index) {
@@ -160,22 +154,17 @@ let App = ({
             const completedItems = note.items.filter(item => item.completed).length;
             const totalItems = note.items.length;
 
-            // Если все пункты выполнены (100%)
             if (completedItems === totalItems) {
-                note.completedDate = new Date().toLocaleString();
-                this.moveNote(index, 3); // Перемещаем в третий столбец
-            }
-            // Если выполнено больше 50% и карточка в первом столбце
-            else if (completedItems > totalItems / 2 && note.column === 1) {
+                // Перемещение в третий столбец
+                this.moveNote(index, 3);
+            } else if (completedItems > totalItems / 2 && note.column === 1) {
                 if (this.secondColumnNotes.length < 5) {
-                    this.moveNote(index, 2); // Перемещаем во второй столбец
+                    this.moveNote(index, 2);
                 } else {
-                    this.isFirstColumnLocked = true; // Блокируем первый столбец, если второй переполнен
+                    this.isFirstColumnLocked = true; // Блокировка первой колонки
                 }
-            }
-            // Если выполнено меньше 50% и карточка не в первом столбце
-            else if (completedItems <= totalItems / 2 && note.column !== 1) {
-                this.moveNote(index, 1); // Возвращаем в первый столбец
+            } else if (note.column === 2 && completedItems === totalItems) {
+                this.moveNote(index, 3);
             }
         },
         saveNotes() {
