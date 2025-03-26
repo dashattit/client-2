@@ -5,11 +5,11 @@ Vue.component('column', {
         <div class="column" :class="{ 'locked': isLocked }">
             <h2>{{ title }}</h2>
             <note-card 
-                v-for="(note, index) in notes" 
+                v-for="note in notes" 
                 :key="note.id" 
                 :note="note" 
-                @update-note="$emit('update-note', index, $event)"
-                @move-note="$emit('move-note', index, $event)"
+                @update-note="handleUpdateNote"
+                @move-note="handleMoveNote"
             ></note-card>
             <button 
                 v-if="title === 'Столбец 1 (до 3 карточек)'" 
@@ -17,7 +17,17 @@ Vue.component('column', {
                 :disabled="notes.length >= maxNotes || isLocked"
             >Добавить карточку</button>
         </div>
-    `
+    `,
+    methods: {
+        // Получение обновленной карточки
+        handleUpdateNote(updatedNote) {
+            this.$emit('update-note', updatedNote);
+        },
+        // Получение номера нового столбца
+        handleMoveNote(newColumn) {
+            this.$emit('move-note', newColumn);
+        }
+    }
 });
 
 // компонент note-card
@@ -38,6 +48,7 @@ Vue.component('note-card', {
         </div>
     `,
     methods: {
+        // Генерация события и передача текущего состояния карточки
         updateCompletion() {
             this.$emit('update-note', this.note);
         }
@@ -54,7 +65,7 @@ let App = ({
                 :maxNotes="3" 
                 :isLocked="isFirstColumnLocked"
                 @update-note="updateNote"
-                @move-note="moveNote"
+                @move-note="moveCurrentNote"
                 @add-note="openModal"
             ></column>
             <column 
@@ -63,7 +74,7 @@ let App = ({
                 :maxNotes="5" 
                 :isLocked="false"
                 @update-note="updateNote"
-                @move-note="moveNote"
+                @move-note="moveCurrentNote"
             ></column>
             <column 
                 title="Столбец 3 (без ограничений)" 
@@ -71,7 +82,7 @@ let App = ({
                 :maxNotes="Infinity" 
                 :isLocked="false"
                 @update-note="updateNote"
-                @move-note="moveNote"
+                @move-note="moveCurrentNote"
             ></column>
             
             <!-- Модальное окно для создания карточки -->
@@ -87,8 +98,21 @@ let App = ({
                             Пункт {{ index + 1 }}:
                             <input v-model="item.text" type="text">
                         </label>
+                        <button 
+                            v-if="newNoteItems.length > minItems" 
+                            @click="newNoteItems.splice(index, 1)"
+                            class="remove-item"
+                        >×</button>
                     </div>
-                    <button @click="addNewItem">Добавить пункт</button>
+                    <div class="item-controls">
+                        <button 
+                            @click="addNewItem" 
+                            :disabled="newNoteItems.length >= maxItems"
+                        >Добавить пункт (макс. {{maxItems}})</button>
+                        <span class="counter">
+                            Пунктов: {{newNoteItems.length}}/{{maxItems}}
+                        </span>
+                    </div>
                     <button @click="createNote">Создать карточку</button>
                     <button @click="closeModal">Отмена</button>
                 </div>
@@ -97,12 +121,19 @@ let App = ({
     `,
     data() {
         return {
-            // notes: JSON.parse(localStorage.getItem('notes')) || [],
-            notes: [],
+            notes: JSON.parse(localStorage.getItem('notes')) || [],
             isFirstColumnLocked: false,
             isModalOpen: false,
             newNoteTitle: '',
-            newNoteItems: [{ text: '', completed: false }]
+            newNoteItems: [{ text: '', completed: false }],
+            currentNote: null,
+            newNoteItems: [
+                { text: '', completed: false },
+                { text: '', completed: false },
+                { text: '', completed: false } // Начальные 3 обязательных пункта
+            ],
+            maxItems: 5, 
+            minItems: 3
         };
     },
     computed: {
@@ -126,9 +157,20 @@ let App = ({
             this.newNoteItems = [{ text: '', completed: false }];
         },
         addNewItem() {
-            this.newNoteItems.push({ text: '', completed: false });
+            if (this.newNoteItems.length < this.maxItems) {
+                this.newNoteItems.push({ text: '', completed: false });
+            }
         },
         createNote() {
+            // Проверка на минимальное количество заполненных пунктов
+            const filledItems = this.newNoteItems.filter(item => item.text.trim() !== '');
+            if (filledItems.length < this.minItems) {
+                alert(`Должно быть заполнено минимум ${this.minItems} пункта`);
+                return;
+            }
+            
+            if (this.firstColumnNotes.length >= 3) return;
+            
             const newNote = {
                 id: Date.now(),
                 title: this.newNoteTitle,
@@ -140,33 +182,59 @@ let App = ({
             this.saveNotes();
             this.closeModal();
         },
-        updateNote(index, updatedNote) {
-            this.notes[index] = updatedNote;
-            this.checkNoteCompletion(index);
-            this.saveNotes();
-        },
-        moveNote(index, newColumn) {
-            this.notes[index].column = newColumn;
-            this.saveNotes();
-        },
-        checkNoteCompletion(index) {
-            const note = this.notes[index];
-            const completedItems = note.items.filter(item => item.completed).length;
-            const totalItems = note.items.length;
-
-            if (completedItems === totalItems) {
-                // Перемещение в третий столбец
-                this.moveNote(index, 3);
-            } else if (completedItems > totalItems / 2 && note.column === 1) {
-                if (this.secondColumnNotes.length < 5) {
-                    this.moveNote(index, 2);
-                } else {
-                    this.isFirstColumnLocked = true; // Блокировка первой колонки
-                }
-            } else if (note.column === 2 && completedItems === totalItems) {
-                this.moveNote(index, 3);
+        updateNote(updatedNote) {
+            const index = this.notes.findIndex(n => n.id === updatedNote.id);
+            if (index !== -1) {
+                this.notes[index] = updatedNote;
+                this.checkNoteCompletion(updatedNote);
+                this.saveNotes();
             }
         },
+        moveCurrentNote(newColumn) {
+            if (!this.currentNote) return;
+            
+            const index = this.notes.findIndex(n => n.id === this.currentNote.id);
+            if (index !== -1) {
+                // Проверяем ограничения для столбца 2
+                if (newColumn === 2 && this.secondColumnNotes.length >= 5) {
+                    this.isFirstColumnLocked = true;
+                    return;
+                }
+                
+                this.notes[index].column = newColumn;
+                this.saveNotes();
+                this.isFirstColumnLocked = false;
+            }
+        },
+        checkNoteCompletion(note) {
+            // Текущее состояние карточки
+            this.currentNote = note;
+            const completedItems = note.items.filter(item => item.completed).length;
+            const totalItems = note.items.length;
+            
+            // Логика перемещений по условиями
+            // 1. Если все пункты выполнены - перемещаем в столбец 3
+            if (completedItems === totalItems && totalItems > 0) {
+                note.completedDate = new Date().toLocaleString();
+                this.$nextTick(() => {
+                    this.moveCurrentNote(3);
+                });
+            } 
+            // 2. Если выполнено больше половины - перемещаем в столбец 2 (если есть место)
+            else if (completedItems > totalItems / 2 && note.column === 1) {
+                this.$nextTick(() => {
+                    this.moveCurrentNote(2);
+                });
+            }
+            // 3. Если в столбце 2 и все пункты выполнены - перемещаем в столбец 3
+            else if (note.column === 2 && completedItems === totalItems && totalItems > 0) {
+                note.completedDate = new Date().toLocaleString();
+                this.$nextTick(() => {
+                    this.moveCurrentNote(3);
+                });
+            }
+        },
+        // Сохранение данных в хранилище
         saveNotes() {
             localStorage.setItem('notes', JSON.stringify(this.notes));
         }
