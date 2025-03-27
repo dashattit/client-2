@@ -1,4 +1,3 @@
-// компонент column
 Vue.component('column', {
     props: ['title', 'notes', 'maxNotes', 'isLocked'],
     template: `
@@ -30,7 +29,6 @@ Vue.component('column', {
     }
 });
 
-// компонент note-card
 Vue.component('note-card', {
     props: ['note'],
     template: `
@@ -55,7 +53,7 @@ Vue.component('note-card', {
     }
 });
 
-// главный компонент App
+// главный компонент App с модальным окном
 let App = ({
     template: `
         <div class="columns">
@@ -86,35 +84,49 @@ let App = ({
             ></column>
             
             <!-- Модальное окно для создания карточки -->
-            <div v-if="isModalOpen" class="modal">
-                <div class="modal-content">
-                    <h2>Создать новую карточку</h2>
-                    <label>
-                        Название карточки:
-                        <input v-model="newNoteTitle" type="text">
-                    </label>
-                    <div v-for="(item, index) in newNoteItems" :key="index">
-                        <label>
-                            Пункт {{ index + 1 }}:
-                            <input v-model="item.text" type="text">
-                        </label>
-                        <button 
-                            v-if="newNoteItems.length > minItems" 
-                            @click="newNoteItems.splice(index, 1)"
-                            class="remove-item"
-                        >×</button>
+            <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Создать новую карточку</h3>
+                        <button @click="closeModal" class="close-btn">&times;</button>
                     </div>
-                    <div class="item-controls">
-                        <button 
-                            @click="addNewItem" 
-                            :disabled="newNoteItems.length >= maxItems"
-                        >Добавить пункт (макс. {{maxItems}})</button>
-                        <span class="counter">
-                            Пунктов: {{newNoteItems.length}}/{{maxItems}}
-                        </span>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Название карточки:</label>
+                            <input v-model="newNoteTitle" type="text" placeholder="Введите название">
+                        </div>
+                        
+                        <div class="items-list">
+                            <div v-for="(item, index) in newNoteItems" :key="index" class="item-row">
+                                <input 
+                                    v-model="item.text" 
+                                    type="text" 
+                                    :placeholder="'Пункт ' + (index + 1)"
+                                >
+                                <button 
+                                    v-if="newNoteItems.length > minItems" 
+                                    @click="removeItem(index)"
+                                    class="remove-btn"
+                                >&times;</button>
+                            </div>
+                        </div>
+                        
+                        <div class="controls">
+                            <button 
+                                @click="addItem" 
+                                :disabled="newNoteItems.length >= maxItems"
+                                class="add-item-btn"
+                            >
+                                Добавить пункт ({{ newNoteItems.length }}/{{ maxItems }})
+                            </button>
+                        </div>
                     </div>
-                    <button @click="createNote">Создать карточку</button>
-                    <button @click="closeModal">Отмена</button>
+                    <div class="modal-footer">
+                        <button @click="createNote" :disabled="!canCreateNote" class="create-btn">
+                            Создать
+                        </button>
+                        <button @click="closeModal" class="cancel-btn">Отмена</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -123,16 +135,15 @@ let App = ({
         return {
             notes: JSON.parse(localStorage.getItem('notes')) || [],
             isFirstColumnLocked: false,
-            isModalOpen: false,
+            showModal: false,
             newNoteTitle: '',
-            newNoteItems: [{ text: '', completed: false }],
-            currentNote: null,
             newNoteItems: [
                 { text: '', completed: false },
                 { text: '', completed: false },
-                { text: '', completed: false } // Начальные 3 обязательных пункта
+                { text: '', completed: false } // начальные три обязательных пункта
             ],
-            maxItems: 5, 
+            currentNote: null,
+            maxItems: 5,
             minItems: 3
         };
     },
@@ -145,30 +156,40 @@ let App = ({
         },
         thirdColumnNotes() {
             return this.notes.filter(note => note.column === 3);
+        },
+        canCreateNote() {
+            const filledItems = this.newNoteItems.filter(item => item.text.trim() !== '');
+            return this.newNoteTitle.trim() !== '' && filledItems.length >= this.minItems;
         }
     },
     methods: {
         openModal() {
-            this.isModalOpen = true;
+            this.showModal = true;
         },
         closeModal() {
-            this.isModalOpen = false;
-            this.newNoteTitle = '';
-            this.newNoteItems = [{ text: '', completed: false }];
+            this.showModal = false;
+            this.resetForm();
         },
-        addNewItem() {
+        resetForm() {
+            this.newNoteTitle = '';
+            this.newNoteItems = [
+                { text: '', completed: false },
+                { text: '', completed: false },
+                { text: '', completed: false }
+            ];
+        },
+        addItem() {
             if (this.newNoteItems.length < this.maxItems) {
                 this.newNoteItems.push({ text: '', completed: false });
             }
         },
-        createNote() {
-            // Проверка на минимальное количество заполненных пунктов
-            const filledItems = this.newNoteItems.filter(item => item.text.trim() !== '');
-            if (filledItems.length < this.minItems) {
-                alert(`Должно быть заполнено минимум ${this.minItems} пункта`);
-                return;
+        removeItem(index) {
+            if (this.newNoteItems.length > this.minItems) {
+                this.newNoteItems.splice(index, 1);
             }
-            
+        },
+        createNote() {
+            if (!this.canCreateNote) return;
             if (this.firstColumnNotes.length >= 3) return;
             
             const newNote = {
@@ -178,6 +199,7 @@ let App = ({
                 column: 1,
                 completedDate: null
             };
+            
             this.notes.push(newNote);
             this.saveNotes();
             this.closeModal();
@@ -212,21 +234,17 @@ let App = ({
             const completedItems = note.items.filter(item => item.completed).length;
             const totalItems = note.items.length;
             
-            // Логика перемещений по условиями
-            // 1. Если все пункты выполнены - перемещаем в столбец 3
             if (completedItems === totalItems && totalItems > 0) {
                 note.completedDate = new Date().toLocaleString();
                 this.$nextTick(() => {
                     this.moveCurrentNote(3);
                 });
             } 
-            // 2. Если выполнено больше половины - перемещаем в столбец 2 (если есть место)
             else if (completedItems > totalItems / 2 && note.column === 1) {
                 this.$nextTick(() => {
                     this.moveCurrentNote(2);
                 });
             }
-            // 3. Если в столбце 2 и все пункты выполнены - перемещаем в столбец 3
             else if (note.column === 2 && completedItems === totalItems && totalItems > 0) {
                 note.completedDate = new Date().toLocaleString();
                 this.$nextTick(() => {
@@ -234,14 +252,12 @@ let App = ({
                 });
             }
         },
-        // Сохранение данных в хранилище
         saveNotes() {
             localStorage.setItem('notes', JSON.stringify(this.notes));
         }
     }
 });
 
-// Главный экземпляр Vue
 let app = new Vue({
     el: '#app',
     template: '<App/>',
